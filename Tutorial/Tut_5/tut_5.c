@@ -13,14 +13,18 @@ event graphs (i++){
 }
 
 event images (t += 4./300.){ //setting time intervals
-    output_ppm(h, linear=true); //enable bilinear interpolation
+	scalar l[];
+  	foreach()
+    	l[] = level;
+	static FILE * fp = fopen ("grid.ppm", "w");
+    output_ppm(l, fp, min = 0, max = 10); 
 }
 event end (t=4){
     printf("i = %d t = %g\n", i, t);
 }
 
 event adapt (i++){
-    adapt_wavelet ({h}, (double[]){4e-3}, maxlevel = 8);
+    adapt_wavelet ({h}, (double[]){4e-3}, maxlevel = 10);
 }
 
 int main(){

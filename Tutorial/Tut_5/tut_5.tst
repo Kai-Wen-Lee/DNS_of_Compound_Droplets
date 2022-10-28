@@ -1,0 +1,2 @@
+bcde7fd7eceaed60c6d3d09c416b7775  tut_5.c
+c7093f07c308b59b454d3785125fda17  tut_5.s

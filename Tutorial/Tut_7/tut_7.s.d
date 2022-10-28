@@ -1,0 +1,21 @@
+tut_7.s:	\
+	/home/kaiwen/basilisk/src/diffusion.h \
+	/home/kaiwen/basilisk/src/run.h \
+	/home/kaiwen/basilisk/src/utils.h \
+	/home/kaiwen/basilisk/src/output.h \
+	/home/kaiwen/basilisk/src/poisson.h \
+	/home/kaiwen/basilisk/src/grid/quadtree.h \
+	/home/kaiwen/basilisk/src/grid/tree.h \
+	/home/kaiwen/basilisk/src/grid/mempool.h \
+	/home/kaiwen/basilisk/src/grid/memindex/range.h \
+	/home/kaiwen/basilisk/src/grid/foreach_cell.h \
+	/home/kaiwen/basilisk/src/grid/neighbors.h \
+	/home/kaiwen/basilisk/src/grid/tree-common.h \
+	/home/kaiwen/basilisk/src/grid/tree-mpi.h \
+	/home/kaiwen/basilisk/src/grid/balance.h \
+	/home/kaiwen/basilisk/src/grid/multigrid-common.h \
+	/home/kaiwen/basilisk/src/grid/cartesian-common.h \
+	/home/kaiwen/basilisk/src/grid/events.h \
+	/home/kaiwen/basilisk/src/grid/fpe.h \
+	/home/kaiwen/basilisk/src/common.h \
+
