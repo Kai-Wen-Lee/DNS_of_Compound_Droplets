@@ -1,31 +1,35 @@
 #include "axi.h"
 #include "navier-stokes/centered.h"
-#include "navier-stokes/swirl.h"
 #include "two-phase.h"
 #include "tension.h"
+#include "tag.h"
 #include "view.h"
 
 //Define radius of jet, init jet len, Re and surface tention coeff
 
-#define radius 1./12.
+#define radius 1./4.
 #define length 0.025
 #define Re 5800
 #define SIGMA 3e-5
 
-int maxlevel = 10;	//max level of refinement =10
-double uemax = 0.1;	//error threshold of velocity is 0.1
+int maxlevel=10;	//max level of refinement =10
+double uemax=0.1;	//error threshold of velocity is 0.1
 
 /* -------------------imposing boundary conditions------------------------------*/
 scalar f0[];												 //set an aux volume fraction field (1 is inside cylinder, 0 is outside cylinder)
-u.n[left] = dirichlet(f0[]*(1.+0.05*sin(10.*2.*pi*t)));		//applying oscilating inflow velocity on lhs
-w[left] = dirichlet(0);
-u.t[left] = dirichlet(0); 									
-p[left] = neumann(0); 			
+u.n[left] = dirichlet(f0[]*(1.+0.5*sin(10.*2.*pi*t)));		//applying oscilating inflow velocity on lhs
+u.t[left] = dirichlet(0); 									//applying BC of zero tangential velocity at inflow
+
+#if dimension>2
+u.r[left] = dirichlet(0); 		//applying bc of zero radial velocity at left boundary
+#endif
+
+
+p[left] = neumann(0); 			//applying bc of zero pressure gradient at left boundary
 f[left] = f0[];
 
-u.n[right] = neumann(0); 			
-p[right] = dirichlet(0);			
-
+u.n[right] = neumann(0); 			//applying bc of zero velocity gradient at right boundary
+p[right] = dirichlet(0);			//applying bc of zero pressure at right boundary (?) 
 /* ----------------------main program---------------------------------*/
 int main(int argc, char * argv[]){
 	if (argc>1)
@@ -35,6 +39,7 @@ int main(int argc, char * argv[]){
 
 	init_grid(64); //discretise initial domain with 64^3 grid points
 	size(3.);
+
 	rho1=1.,rho2=1./27.84;
 	mu1=2.*radius/Re*rho1;
 	mu2=2.*radius/Re*rho2;
@@ -54,19 +59,17 @@ event init (t=0){
 
 
 		/* init the aux vol fraction field held for a cyl of constant radius*/
-		fraction (f0,y);
+		fraction (f0,radius-y);
 		f0.refine=f0.prolongation=fraction_refine;
 		restriction ({f0});		//for BC on levels
 
 		/* use this to define the init jet and its velocity*/
-		
 		foreach(){
 			f[]=f0[]*(x<length);
 			u.x[]=f[];
 		}
 	}
 }
-
 
 /* -------------------Output -------------------*/
 
@@ -77,7 +80,6 @@ event logfile (i++){
 }
 
 //generating animation using basilisk view
-
 event movie (t += 1e-2){
 #if dimension ==2
 	scalar omega[];
@@ -96,6 +98,15 @@ event movie (t += 1e-2){
 	draw_vof("f");
 #endif
 	save("movie.mp4");
+}
+
+event snapshot (t=0.1;t+=0.1;t<=3.8){
+	char name[80];
+	sprintf (name, "snapshot-%g", t);
+	scalar pid[];
+	foreach()
+		pid[]=fmod(pid()*(npe()+37),npe());
+	dump (name);
 }
 
 event adapt(i++){

@@ -1,9 +1,9 @@
 pulsejet_axis.s:	\
 	/home/kaiwen/basilisk/src/axi.h \
 	/home/kaiwen/basilisk/src/navier-stokes/centered.h \
-	/home/kaiwen/basilisk/src/navier-stokes/swirl.h \
 	/home/kaiwen/basilisk/src/two-phase.h \
 	/home/kaiwen/basilisk/src/tension.h \
+	/home/kaiwen/basilisk/src/tag.h \
 	/home/kaiwen/basilisk/src/view.h \
 	/home/kaiwen/basilisk/src/utils.h \
 	/home/kaiwen/basilisk/src/input.h \
@@ -27,10 +27,6 @@ pulsejet_axis.s:	\
 	/home/kaiwen/basilisk/src/utils.h \
 	/home/kaiwen/basilisk/src/vof.h \
 	/home/kaiwen/basilisk/src/fractions.h \
-	/home/kaiwen/basilisk/src/tracer.h \
-	/home/kaiwen/basilisk/src/diffusion.h \
-	/home/kaiwen/basilisk/src/poisson.h \
-	/home/kaiwen/basilisk/src/bcg.h \
 	/home/kaiwen/basilisk/src/run.h \
 	/home/kaiwen/basilisk/src/timestep.h \
 	/home/kaiwen/basilisk/src/bcg.h \

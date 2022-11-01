@@ -21,7 +21,7 @@ event mov (t += 0.1){
 	scalar lev[];
 	foreach()
 		lev[] = level;
-	output_ppm (lev, file = "level.mp4", n = 126, max =6);
+	output_ppm (lev, file = "level.mp4", n = 256, max =6);
 }
 //n = resolution, min, mix = colour bar
 event diff (i++){
@@ -46,7 +46,7 @@ event lot (i += 5){
 //Finally, a data file is writen to check if the scalar field s is conserved.
 
 event adapt (i++)
-	adapt_wavelet ({s}, (double[]){0.01}, 15);
+	adapt_wavelet ({s}, (double[]){0.01}, 5);
 
 event stop (t = 10);
 
