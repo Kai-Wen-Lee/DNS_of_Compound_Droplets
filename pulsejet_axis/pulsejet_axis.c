@@ -7,17 +7,19 @@
 
 //Define radius of jet, init jet len, Re and surface tention coeff
 
-#define radius 1./4.
-#define length 0.025
-#define Re 5800
+#define radius_outer 12.56/100.
+#define radius_inner 9.02/100.
+#define length 0.0005
+#define Re 500
 #define SIGMA 3e-5
+#define Fr 0.88
 
 int maxlevel=10;	//max level of refinement =10
 double uemax=0.1;	//error threshold of velocity is 0.1
 
 /* -------------------imposing boundary conditions------------------------------*/
 scalar f0[];												 //set an aux volume fraction field (1 is inside cylinder, 0 is outside cylinder)
-u.n[left] = dirichlet(f0[]*(1.+0.5*sin(10.*2.*pi*t)));		//applying oscilating inflow velocity on lhs
+u.n[left] = dirichlet(f0[]);		//applying oscilating inflow velocity on lhs
 u.t[left] = dirichlet(0); 									//applying BC of zero tangential velocity at inflow
 
 #if dimension>2
@@ -38,11 +40,10 @@ int main(int argc, char * argv[]){
 		uemax = atof (argv[2]);		//optional cl arguments: error threshold
 
 	init_grid(64); //discretise initial domain with 64^3 grid points
-	size(3.);
-
-	rho1=1.,rho2=1./27.84;
-	mu1=2.*radius/Re*rho1;
-	mu2=2.*radius/Re*rho2;
+	size(10.*radius_outer);
+	rho1=1000.,rho2=1.225;
+	mu1=2.*radius_outer/Re*rho1;
+	mu2=2.*radius_inner/Re*rho2;
 	f.sigma=SIGMA;
 
 	run();
@@ -50,16 +51,25 @@ int main(int argc, char * argv[]){
 }
 
 /* -------------------setting initial conditions -------------------------------*/
+event acceleration (i++) {
+  face vector av = a;
+  foreach_face(x)
+  av.x[] += 0.92;
+}
+
 event init (t=0){
 	if(!restore (file="restart")){
 
 		/*use a static refinement down to maxlevel in a cyl. 1.2 times longer than 
 		the init jet and twice the radies*/
-		refine (x<1.2*length && y<2.*radius && level <maxlevel);
+		refine (x<20*length && y<2.*radius_outer && level <maxlevel);
 
 
-		/* init the aux vol fraction field held for a cyl of constant radius*/
-		fraction (f0,radius-y);
+		/* init the aux vol fraction field held for a cyl of constant radius
+		double outer_circle = y - radius_outer;
+		double inner_circle = y - radius_inner;
+		double annulus = difference (outer_circle, inner_circle);*/
+		fraction (f0, difference((radius_outer - y), (radius_inner - y)));
 		f0.refine=f0.prolongation=fraction_refine;
 		restriction ({f0});		//for BC on levels
 
@@ -81,22 +91,12 @@ event logfile (i++){
 
 //generating animation using basilisk view
 event movie (t += 1e-2){
-#if dimension ==2
-	scalar omega[];
-	vorticity (u,omega);
-	view (tx =-0.5);
+
+	view (tx = -5.*radius_outer);
 	clear();
 	draw_vof ("f");
-	squares ("omega", linear = true, spread =10);
 	box();
-#else
-	scalar pid[];
-	foreach()
-			pid[]=fmod(pid()*(npe()+37),npe());
-	view (camera ="iso", fov=14.5,tx=-0.418,ty=0.288,width=1600,height=1200);
-	clear();
-	draw_vof("f");
-#endif
+
 	save("movie.mp4");
 }
 
