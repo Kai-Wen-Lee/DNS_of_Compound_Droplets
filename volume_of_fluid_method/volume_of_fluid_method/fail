@@ -1,3 +1,0 @@
-qcc -autolink -O2 -g -Wall -pipe -D_FORTIFY_SOURCE=2 -DDUMBGL -o volume_of_fluid_method/volume_of_fluid_method volume_of_fluid_method.c  -lm
-volume_of_fluid_method.c:24: error: undeclared variable 'mu'
-make: *** [volume_of_fluid_method.s] Error 1
