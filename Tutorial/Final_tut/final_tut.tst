@@ -1,2 +1,0 @@
-3cd923ef17f50bec3a4a6af37097ed9f  final_tut.c
-01b17bb1ada93b85f68caabcdd40a191  final_tut.s
