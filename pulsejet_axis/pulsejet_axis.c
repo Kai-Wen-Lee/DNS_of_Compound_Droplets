@@ -16,7 +16,7 @@
 
 
 //define repeating variables
-#define U_g 5.3
+#define U_g 1.25
 #define D_i 0.00902
 #define Rho_g 1.225
 
@@ -77,13 +77,13 @@ event init (t=0){
 		}
 	}
 }
-
+/*
 event acceleration (i++) {
   face vector av = a;
   foreach_face(x)
   av.x[] += Fr*sq(U_g)/D_i;
 }
-
+*/
 /* -------------------Output -------------------*/
 
 event logfile (i++){
@@ -97,6 +97,7 @@ event movie (t += 1e-2){
 	view (tx = -0.5);
 	clear();
 	draw_vof ("f");
+	squares("u.x", linear =true);
 	box();
 
 	save("movie.mp4");
