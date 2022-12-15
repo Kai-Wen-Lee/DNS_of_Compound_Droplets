@@ -14,15 +14,14 @@ import struct
 import numpy as np
 import matplotlib.pyplot as plt
 
-with open("ux-2400.bin","rb") as file:
+with open("frac-355.bin","rb") as file:
     # read first number, which gives the size N
     N = int(struct.unpack('f'*1, file.read(4*1))[0])
+    size = (N+1)*(N+1)
+    print('UX BIN init size:\t', N, '\tCELLS\t', size)
     
-print(N)
-size = (N+1)*(N+1)
-print(size)
 
-with open("ux-2400.bin","rb") as file:
+with open("frac-355.bin","rb") as file:
     numbers = struct.unpack('f'*size, file.read(4*size))
 
 A = np.array(numbers)
@@ -32,9 +31,11 @@ y = A[0,1:]
 f = A[1:,1:]
 f = np.rot90(f, k=3)
 
-
+plt.clf()
 plt.contourf(x,y,f, antialiased=False)
 #plt.imshow(f)
 #plt.imshow(f, vmin=0, vmax=1)
+plt.colorbar()
 plt.show()
-print (x,y)
+
+print (x,y,f)
