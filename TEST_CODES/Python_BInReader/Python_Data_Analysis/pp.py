@@ -25,6 +25,7 @@ for filename in sorted(glob.iglob(f'{directory}/*'),key=os.path.basename):
     f = A[1:,1:]
     f = np.rot90(f, k=3)
     f = np.flip(f, 1)
+
  
 
     plt.clf()
