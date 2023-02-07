@@ -7,22 +7,22 @@
 #include "reduced.h"
 
 //Define dimless parameters
-#define Re_g 2666.022
-#define Re_l 26.68748
-#define We 0.303164
-#define Fr 0.004662
-#define D_rel 0.6
+#define Re_g 2666.021505
+#define Re_l 49.588
+#define We 3.031640962
+#define Fr 214.5104818
+#define D_rel 0.732484076
 #define Rho_rel 0.001225
-#define U_rel 4.356436
-#define initjetlen_coeff 1.0
-#define domsize_coeff 20
+#define U_rel 4.356435644
+#define domsize_coeff 10
 //define repeating variables
 #define U_g 1.
 #define D_i 1.
 #define Rho_g 1.
 
 int maxlevel=10;	//max level of refinement =10
-double uemax=0.1;	//error threshold of velocity is 0.1
+double uemax=0.001;	//error threshold of velocity is 0.01
+double femax=0.01; //error threshold of volume fraction field is 0.001
 
 /* -------------------imposing boundary conditions------------------------------*/
 scalar f0[];
@@ -55,7 +55,7 @@ int main(int argc, char * argv[]){
 	mu2=D_i*rho2*U_g/Re_g;
 	f.sigma=D_i*sq(U_g)*rho2/We;
 
-	G.x = Fr*sq(U_g)/D_i;
+	G.x = sq(U_g)/(D_i*Fr);
 	run();
 
 }
@@ -66,14 +66,14 @@ event init (t=0){
 
 		/*use a static refinement down to maxlevel in a cyl. 1.2 times longer than 
 		the init jet and twice the radies*/
-		refine (x<(domsize_coeff-1)*D_i && y<2.*D_i/D_rel && level <maxlevel);
+		refine (x<(domsize_coeff*0.99)*D_i && y<2.*D_i/D_rel && level <maxlevel);
 		
 		fraction (f0, difference((D_i/D_rel - y),(D_i - y)));
 		f0.refine=f0.prolongation=fraction_refine;
 		restriction ({f0});
 		
 		foreach(){
-			f[]=f0[]*(x<initjetlen_coeff*D_i);
+			f[]=f0[]*(0<x && D_i<y && y<D_i/D_rel && x<sqrt(sq((D_i/D_rel-D_i)/2.)-sq(y-D_i-(D_i/D_rel-D_i)/2.)));
 			u.x[]=f[]*U_g/U_rel;
 		}
 	}
@@ -110,10 +110,10 @@ event field_binout (t+=0.1){
 }
 
 
-event end (t=0;t+=0.1;t<=9.9){
+event end (t=0.;t+=0.1;t<=30.){
 }
 
 event adapt(i++){
-	//adapt_wavelet({f,u}, (double[]){0.01,uemax,uemax,uemax},maxlevel);
-	unrefine (x>(domsize_coeff-1)*D_i);
+	adapt_wavelet({f,u}, (double[]){femax,uemax,uemax,uemax},maxlevel);
+	//unrefine (x>(domsize_coeff*0.99)*D_i);
 }

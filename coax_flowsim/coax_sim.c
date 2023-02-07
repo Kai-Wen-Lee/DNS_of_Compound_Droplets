@@ -7,38 +7,46 @@
 #include "reduced.h"
 
 //Define dimless parameters
-#define Re_g 2666.022
-#define Re_l 26.68748
-#define We 0.303164
-#define Fr 0.004662
-#define D_rel 0.6
+#define Re_g 2666.021505
+#define Re_l 49.588
+#define We 3.031640962
+#define Fr 214.5104818
+#define D_rel 0.732484076
 #define Rho_rel 0.001225
-#define U_rel 2.5
-#define initjetlen_coeff 1.0
-#define domsize_coeff 20
+#define U_rel 4.356435644
+#define domsize_coeff 10
 //define repeating variables
 #define U_g 1.
 #define D_i 1.
 #define Rho_g 1.
 
-int maxlevel=8;	//max level of refinement =10
-double uemax=0.1;	//error threshold of velocity is 0.1
+int maxlevel=10;					//max level of refinement
+double uemax=0.01;					//max velocity error 
+double femax=0.001; 				//max volume fraction error
+
+/*
+uemax and femax are important when choosing the computational domain size as
+these two parameters determine when grid refinement is applied.
+Generally, larger computational domain requires a smaller error threshold.
+*/
 
 /* -------------------imposing boundary conditions------------------------------*/
 scalar f0[];
-u.n[left] = dirichlet(U_g+((U_g/U_rel)-U_g)*((y-D_i)>0 ? 1. : 0.)-(U_g/U_rel)*((y-(D_i/D_rel))>0 ? 1. : 0.));	
+u.n[left] = dirichlet(U_g+((U_g/U_rel)-U_g)*((y-D_i)>0 ? 1. : 0.)-(U_g/U_rel)*((y-(D_i/D_rel))>0 ? 1. : 0.));
+									//applying step velocity profile at inlet	
 u.t[left] = dirichlet(0.); 									
 
 #if dimension>2
-u.r[left] = dirichlet(0.); 		//applying bc of zero radial velocity at left boundary
+u.r[left] = dirichlet(0.); 			//applying bc of zero radial velocity at left boundary
 #endif
 
 
-p[left] = neumann(0.); 			//applying bc of zero pressure gradient at left boundary
+p[left] = neumann(0.); 				//applying bc of zero pressure gradient at left boundary
 f[left] = f0[];
 
 u.n[right] = neumann(0.); 			//applying bc of zero velocity gradient at right boundary
 p[right] = dirichlet(0.);			//applying bc of zero pressure at right boundary (?) 
+
 /* ----------------------main program---------------------------------*/
 int main(int argc, char * argv[]){
 	if (argc>1)
@@ -46,7 +54,7 @@ int main(int argc, char * argv[]){
 	if (argc >2)
 		uemax = atof (argv[2]);		//optional cl arguments: error threshold
 
-	init_grid(256); //discretise initial domain with 64^3 grid points
+	init_grid(256); 				//discretise initial domain with 256^2 grid points
 	size(domsize_coeff*D_i);
 	DT = 0.1;
 
@@ -55,7 +63,7 @@ int main(int argc, char * argv[]){
 	mu2=D_i*rho2*U_g/Re_g;
 	f.sigma=D_i*sq(U_g)*rho2/We;
 
-	G.x = Fr*sq(U_g)/D_i;
+	G.x = sq(U_g)/(D_i*Fr);
 	run();
 
 }
@@ -64,16 +72,21 @@ int main(int argc, char * argv[]){
 event init (t=0){
 	if(!restore (file="restart")){
 
-		/*use a static refinement down to maxlevel in a cyl. 1.2 times longer than 
-		the init jet and twice the radies*/
-		refine (x<(domsize_coeff-1)*D_i && y<2.*D_i/D_rel && level <maxlevel);
+		/*initial grid refinement in a cylinder at:
+			99% of the length of computational domain 
+			and 2 times the initial outer diameter*/
+		refine (x<(domsize_coeff*0.99)*D_i && y<2.*D_i/D_rel && level <maxlevel);
 		
+		/*initialise annular liquid sheet volume fraction*/
 		fraction (f0, difference((D_i/D_rel - y),(D_i - y)));
 		f0.refine=f0.prolongation=fraction_refine;
 		restriction ({f0});
 		
+		/*change the shape of initial jet to a half-circular shape
+		this is done to reduce effects of surface tension on the initial jet, 
+		then apply the initial jet velocity*/
 		foreach(){
-			f[]=f0[]*(x<initjetlen_coeff*D_i);
+			f[]=f0[]*(0<x && D_i<y && y<D_i/D_rel && x<sqrt(sq((D_i/D_rel-D_i)/2.)-sq(y-D_i-(D_i/D_rel-D_i)/2.)));
 			u.x[]=f[]*U_g/U_rel;
 		}
 	}
@@ -101,14 +114,9 @@ event movie (t += 1e-2){
 	save("movie.mp4");
 }
 
-event ux_binout (t+=0.5){
-	char filename[256];
-	sprintf(filename,"ux-%f.bin",t);
-	FILE * fp_u=fopen(filename,"w");
-	output_matrix(u.x, fp_u, linear=true);
-	fclose(fp_u);
-}
-event field_binout (t+=0.5){
+/*Labels and outputs volume fraction at specified timestep as binary files
+See accompanying python scripts to read binary file*/
+event field_binout (t+=0.1){
 	char filename[256];
 	sprintf(filename,"frac-%f.bin",t);
 	FILE * fp_f=fopen(filename,"w");
@@ -116,18 +124,19 @@ event field_binout (t+=0.5){
 	fclose(fp_f);
 }
 
-event p_binout(t+=0.25){
-	char filename[256];
-	sprintf(filename,"pres-%f.bin",t);
-	FILE * fp_p=fopen(filename,"w");
-	output_matrix(p, fp_p, linear=true);
-	fclose(fp_p);
-}
 
-event end (t=0;t+=0.1;t<=60){
+event end (t=0.;t+=0.1;t<=15.){
 }
 
 event adapt(i++){
-	adapt_wavelet({f,u}, (double[]){0.01,uemax,uemax,uemax},maxlevel);
-	unrefine (x>(domsize_coeff-1)*D_i);
+	adapt_wavelet({f,u}, (double[]){femax,uemax,uemax,uemax},maxlevel)
+
+	/*THis is a stop gap solution to prevent backflow during simulation
+	by coarsening the mesh to the coarsest setting after 99% of computational domain length.
+	However, backflow are usually caused by incorrect femax and uemax values or other parameters,
+	and volume might not be conserved 
+	so this measure should only be used when necessary*/
+
+	//unrefine (x>(domsize_coeff*0.99)*D_i);	
+
 }
