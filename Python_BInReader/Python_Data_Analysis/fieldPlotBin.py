@@ -14,18 +14,26 @@ import struct
 import numpy as np
 import matplotlib.pyplot as plt
 
-with open("frac-4.000000.bin","rb") as file:
+with open("frac-12.400000.bin","rb") as file:
     # read first number, which gives the size N
     N = int(struct.unpack('f'*1, file.read(4*1))[0])
     size = (N+1)*(N+1)
     print('UX BIN init size:\t', N, '\tCELLS\t', size)
-    
 
-with open("frac-4.000000.bin","rb") as file:
-    numbers = struct.unpack('f'*size, file.read(4*size))
+'''
+with open("frac-12.400000.bin","rb") as file:
+    numbers = np.fromfile("frac-0.100000.bin", dtype=np.float32)
+'''
 
-A = np.array(numbers)
-A = np.reshape(A, (N+1,N+1))
+# Create a memory-mapped array for the binary file
+numbers = np.memmap("frac-12.400000.bin", dtype=np.float32, mode="r")
+
+# Print the first 10 values
+print(numbers[:10])
+
+
+#A = np.array(numbers)
+A = np.reshape(numbers, (N+1,N+1))
 x = A[1:,0]
 y = A[0,1:]
 f = A[1:,1:]
@@ -37,20 +45,3 @@ plt.contourf(x,y,f, antialiased=False)
 #plt.imshow(f, vmin=0, vmax=1)
 plt.colorbar()
 plt.show()
-
-vol_arr=[]
-count_x=0
-for x_i in x[1:]:
-    count_y=0
-    for y_i in y[1:]:
-        dr=y_i-y[count_y]
-        dx=x_i-x[count_x]
-        vf_i=2*np.pi*dr*dx*y_i*f[count_x,count_y]
-        #print(dr,dx,vf_i,f[count_x,count_y])
-        vol_arr.append(vf_i)
-        count_y+=1
-        #print('countx:',str(count_x),'\t','county:',str(count_y),'\t','x_i',str(x_i),'\t','y_i',str(y_i),'\t','dr',str(dr),'\t','dx',str(dx),'\t','vf_i',str(vf_i),file=f)
-        #print(fra_arr[count_x,count_y])
-    count_x+=1
-vol=np.sum(vol_arr)
-print(vol)

@@ -2,10 +2,10 @@
 #include "navier-stokes/centered.h"
 #include "two-phase.h"
 #include "tension.h"
-#include "tag.h"
 #include "view.h"
 #include "reduced.h"
-
+#include "output_fields/output_vtu_bin_foreach.h"
+#include <stdint.h>
 //Define dimless parameters
 #define Re_g 2666.021505
 #define Re_l 49.588
@@ -23,7 +23,6 @@
 int maxlevel=10;	//max level of refinement =10
 double uemax=0.01;	//error threshold of velocity is 0.01
 double femax=0.001; //error threshold of volume fraction field is 0.001
-
 /* -------------------imposing boundary conditions------------------------------*/
 scalar f0[];
 u.n[left] = dirichlet(U_g+((U_g/U_rel)-U_g)*((y-D_i)>0 ? 1. : 0.)-(U_g/U_rel)*((y-(D_i/D_rel))>0 ? 1. : 0.));	
@@ -46,6 +45,7 @@ int main(int argc, char * argv[]){
 	if (argc >2)
 		uemax = atof (argv[2]);		//optional cl arguments: error threshold
 
+
 	init_grid(256); //discretise initial domain with 64^3 grid points
 	size(domsize_coeff*D_i);
 	DT = 0.1;
@@ -54,7 +54,6 @@ int main(int argc, char * argv[]){
 	mu1=D_i*rho2*U_g/Re_l;
 	mu2=D_i*rho2*U_g/Re_g;
 	f.sigma=D_i*sq(U_g)*rho2/We;
-
 	G.x = sq(U_g)/(D_i*Fr);
 	run();
 
@@ -102,10 +101,11 @@ event movie (t += 1e-2){
 }
 
 event field_binout (t+=0.1){
+	scalar lev[];
 	char filename[256];
 	sprintf(filename,"frac-%f.bin",t);
 	FILE * fp_f=fopen(filename,"w");
-	output_matrix(f, fp_f, linear=true);
+	output_vtu_bin_foreach((scalar *){f}, (vector *){u}, fp_f, false);
 	fclose(fp_f);
 }
 
