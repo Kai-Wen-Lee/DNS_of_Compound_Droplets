@@ -1,44 +1,57 @@
-#include "axi.h"
-#include "navier-stokes/centered.h"
-#include "two-phase.h"
-#include "tension.h"
-#include "view.h"
-#include "reduced.h"
-#include "output_vtu_bin_foreach.h"
+#include "axi.h"						//module for axisymmetric flow
+#include "navier-stokes/centered.h"		//module for cell centered incompressible variable density navier stokes flow
+#include "navier-stokes/perfs.h"		//module for logging
+#include "two-phase.h"					//module for volume of fliuid method
+#include "tension.h"					//module for surface tension calculation
+#include "view.h"						//module for Basilisk view to output animations
+#include "reduced.h"					//module for gravity for interfacial flow
+#include "output_vtu_bin_foreach.h"		//custom module by cselcuk
 #include <stdint.h>
-//Define dimless parameters
-#define Re_g 565.1587097
-#define Re_l 10.511952
-#define We 1.487149209
-#define Fr 13220.51427
+
+//Provide dimensionless numbers here
+#define Re_g 238.7540323
+#define Re_l 4.440825
+#define We 0.849307781
+#define Fr 2359.439955
 #define D_rel 0.533333333
 #define Rho_rel 0.00129
-#define U_rel 6.51025448
+#define U_rel 2.750288515
 #define domsize_coeff 20
-//define repeating variables
+
+//Repeating variables set to unity
 #define U_g 1.
 #define D_i 1.
 #define Rho_g 1.
 
+//Initial jet profile eclipse shape factors
+#define ell_sf_A 2.0
+#define ell_sf_B 1.5
+
+//Define simulation time
+#define T_END 60.
+
 int maxlevel=7;	//max level of refinement =10
 double uemax=0.000001;	//error threshold of velocity is 0.01
 double femax=0.0000001; //error threshold of volume fraction field is 0.001
-/* -------------------imposing boundary conditions------------------------------*/
-scalar f0[];
-u.n[left] = dirichlet(U_g+((U_g/U_rel)-U_g)*((y-D_i)>0 ? 1. : 0.)-(U_g/U_rel)*((y-(D_i/D_rel))>0 ? 1. : 0.));	
-u.t[left] = dirichlet(0.); 									
+
+//Boundary Conditions
+scalar f0[];	//aux volume fraction field for liquid phase	
+u.n[left] = dirichlet((y >= 0 && y <= D_i) ? U_g : (y > D_i && y <= D_i/D_rel) ? (U_g/U_rel) : 0);	//Fluid inflow velocity profile normal to boundary
+u.t[left] = dirichlet(0.);	//Fluid inflow velocity tangential to boundary set to zero 									
 
 #if dimension>2
 u.r[left] = dirichlet(0.); 		//applying bc of zero radial velocity at left boundary
 #endif
 
+p[left] = neumann(0.);	//Zero pressure gradient at left boundary
+f[left] = (y > D_i && y <= D_i/D_rel) ? f[] : 0;	//Define fluid volume fraction field at boundary
 
-p[left] = neumann(0.); 			//applying bc of zero pressure gradient at left boundary
-f[left] = f0[];
+// Free flow condition for the rest of the boundaries
+u.n[right] = neumann(0);
+u.n[top] = neumann(0);
+p[right] = neumann(0.);
 
-u.n[right] = neumann(0.); 			//applying bc of zero velocity gradient at right boundary
-p[right] = dirichlet(0.);			//applying bc of zero pressure at right boundary (?) 
-/* ----------------------main program---------------------------------*/
+//Main program (simulation starts here)
 int main(int argc, char * argv[]){
 	if (argc>1)
 		maxlevel = atoi (argv[1]);
@@ -46,38 +59,43 @@ int main(int argc, char * argv[]){
 		uemax = atof (argv[2]);
 
 
-	init_grid(256);
-	size(domsize_coeff*D_i);
-	DT = 0.1;
+	//Computational domain settings
+	init_grid(256);				//Initial grid
+	size(domsize_coeff*D_i);		//Computational domain size
+	//DT = 0.1;						//enforcing a minimum timestep of 0.1
 
-	rho1=Rho_g/Rho_rel,rho2=Rho_g;
-	mu1=D_i*rho2*U_g/Re_l;
-	mu2=D_i*rho2*U_g/Re_g;
-	f.sigma=D_i*sq(U_g)*rho2/We;
-	G.x = sq(U_g)/(D_i*Fr);
+	//FLuid properties obtained from dimensionless numbers
+	rho1=Rho_g/Rho_rel,rho2=Rho_g; 	//rho1 = gas density, rho2 = liquid density
+	mu1=D_i*rho2*U_g/Re_l;			//mu1 = gas viscousity
+	mu2=D_i*rho2*U_g/Re_g;			//mu2 = water viscousity
+	f.sigma=D_i*sq(U_g)*rho2/We;	//f.sigma = liquid surface tension
+	G.x = sq(U_g)/(D_i*Fr);			//G.x = gravitational acceleration
+
+	//TOLERANCE = 1e-4;
 	run();
 }
 
-/* -------------------setting initial conditions -------------------------------*/
+//Initial conditions
 event init (t=0){
 	if(!restore (file="restart")){
+		/*Initial refinement in the region defined as below up to the maximum refinement level*/
+		refine (x < domsize_coeff*0.9 && sq(y) + sq(z) < 2.*sq(D_i/D_rel) && level < maxlevel);
 
-		/*use a static refinement down to maxlevel in a cyl. 1.2 times longer than 
-		the init jet and twice the radies*/
-		refine (x<(domsize_coeff*0.99)*D_i && y<2.*D_i/D_rel && level <maxlevel);
-		
-		fraction (f0, difference((D_i/D_rel - y),(D_i - y)));
+		// Initialise scalar field f0 as the liquid phase volume fraction
+		fraction(f0,sq(D_i/D_rel) - sq(y) - sq(z));
 		f0.refine=f0.prolongation=fraction_refine;
 		restriction ({f0});
 		
 		foreach(){
-			f[]=f0[]*(0<x && D_i<y && y<D_i/D_rel && x<sqrt(sq((D_i/D_rel-D_i)/2.)-sq(y-D_i-(D_i/D_rel-D_i)/2.)));
-			u.x[]=f[]*U_g/U_rel;
+			//"Trim" the volume fraction to the initial jet profile, and append to f[]
+			f[] = f0[]*(sq(D_i/D_rel) > sq(y) + sq(z) && sq(D_i) < sq(y) + sq(z) && x<=ell_sf_A*(sqrt(sq((D_i/D_rel-D_i)/2.)-sq(y-D_i-(D_i/D_rel-D_i)/2.))));
+			//Set initial velocity
+			u.x[]= sq(D_i)>=sq(y)+sq(z) && x<=D_i ? U_g : sq(D_i/D_rel)>=sq(y) + sq(z) && sq(D_i)<=sq(y)+sq(z) && x<=ell_sf_A*(sqrt(sq((D_i/D_rel-D_i)/2.)-sq(y-D_i-(D_i/D_rel-D_i)/2.))) ? f[]*U_g/U_rel : 0;
 		}
 	}
 }
 
-/* -------------------Output -------------------*/
+//Run time logger
 event logfile (i++){
 	if (i==0)
 			fprintf (stderr, "t dt mgp.i mgpf.p mgu.i grid->tn perf.t perf.speed\n");
@@ -85,20 +103,30 @@ event logfile (i++){
 	
 }
 
+event perf_plot (t=T_END*U_rel) {
+  if (getenv ("DISPLAY"))
+    popen ("gnuplot -e 'set term x11 noraise title perfs' "
+	   "$BASILISK/navier-stokes/perfs.plot "
+	   "& read dummy; kill $!", "w");
+}
+
+//Output animation
 event movie (t += 1e-2){
-	view (tx = -0.5);
+	//view (tx = -0.5);
+	view(tx = -0.5);
 	clear();
 	draw_vof("f");
-	//squares ("u.x", linear = true);
+	squares ("u.x", linear = true);
 	box();
 	mirror(n={0,1}){
 		draw_vof("f");
-		//squares ("u.x", linear = true);
+		//squares ("u.y", linear = true);
 		box();	
 	}
 	save("movie.mp4");
 }
 
+//Output Paraview XML VTU file for post processing
 event field_binout (t+=0.1){
 	scalar lev[];
 	char filename[256];
@@ -108,18 +136,18 @@ event field_binout (t+=0.1){
 	fclose(fp_f);
 }
 
-event end (t=0.;t+=0.1;t<=60.){
+//Set simulation time
+event end (t=0, i++, t<=T_END*U_rel){
 }
 
+//Wavelet-based adaptive grid refinement function
 event adapt(i++){
 	adapt_wavelet({f,u}, (double[]){femax,uemax,uemax,uemax},maxlevel);
 
+	//unrefine (x>(domsize_coeff*0.99)*D_i);
 	/*THis is a stop gap solution to prevent backflow during simulation
 	by coarsening the mesh to the coarsest setting after 99% of computational domain length.
-	However, backflow are usually caused by incorrect femax and uemax values or other parameters,
+	However, backflow are usually caused by incorrect outflow boundary conditions,
 	and volume might not be conserved 
 	so this measure should only be used when necessary*/
-
-	//unrefine (x>(domsize_coeff*0.99)*D_i);	
-
 }
