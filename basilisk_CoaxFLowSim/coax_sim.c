@@ -9,15 +9,16 @@
 #include <stdint.h>
 
 //Provide dimensionless numbers here
-#define Re_g 238.7540323
-#define Re_l 4.440825
-#define We 0.849307781
-#define Fr 2359.439955
-#define D_rel 0.533333333
+#define Re_g 117.7367742
+#define Re_l 2.189904
+#define We 0.064541337
+#define Fr 573.7619776
+#define D_rel 0.5333333
 #define Rho_rel 0.00129
-#define U_rel 2.750288515
+#define U_rel 1.356249755
 #define domsize_coeff 20
-
+#define osc_amp -0.1
+#define osc_freq 0.1
 //Repeating variables set to unity
 #define U_g 1.
 #define D_i 1.
@@ -37,7 +38,7 @@ double femax=0.0000001; //error threshold of volume fraction field is 0.001
 //Boundary Conditions
 scalar f0[];	//aux volume fraction field for liquid phase	
 u.n[left] = dirichlet((y >= 0 && y <= D_i) ? U_g : (y > D_i && y <= D_i/D_rel) ? (U_g/U_rel) : 0);	//Fluid inflow velocity profile normal to boundary
-u.t[left] = dirichlet(0.);	//Fluid inflow velocity tangential to boundary set to zero 									
+u.t[left] = dirichlet((y >= 0 && y <= D_i) ? 0 : (y > D_i && y <= D_i/D_rel) ? osc_amp*U_g/U_rel*sin(osc_freq*2.*pi*t) : 0);	//Fluid inflow velocity tangential to boundary set to zero 										
 
 #if dimension>2
 u.r[left] = dirichlet(0.); 		//applying bc of zero radial velocity at left boundary
@@ -47,10 +48,8 @@ p[left] = neumann(0.);	//Zero pressure gradient at left boundary
 f[left] = (y > D_i && y <= D_i/D_rel) ? f[] : 0;	//Define fluid volume fraction field at boundary
 
 // Free flow condition for the rest of the boundaries
-u.n[right] = neumann(0);
-u.n[top] = neumann(0);
-p[right] = neumann(0.);
-
+u.n[right] = neumann(0.);
+p[right] = dirichlet(0.);
 //Main program (simulation starts here)
 int main(int argc, char * argv[]){
 	if (argc>1)
@@ -60,7 +59,7 @@ int main(int argc, char * argv[]){
 
 
 	//Computational domain settings
-	init_grid(256);				//Initial grid
+	init_grid(512);				//Initial grid
 	size(domsize_coeff*D_i);		//Computational domain size
 	//DT = 0.1;						//enforcing a minimum timestep of 0.1
 
@@ -79,18 +78,23 @@ int main(int argc, char * argv[]){
 event init (t=0){
 	if(!restore (file="restart")){
 		/*Initial refinement in the region defined as below up to the maximum refinement level*/
+		//refine (x<(domsize_coeff*0.99)*D_i && y<2.*D_i/D_rel && level < maxlevel);
 		refine (x < domsize_coeff*0.9 && sq(y) + sq(z) < 2.*sq(D_i/D_rel) && level < maxlevel);
-
-		// Initialise scalar field f0 as the liquid phase volume fraction
+		//fraction (f0, difference((D_i/D_rel - y),(D_i - y)));
+		//fraction (f0, ((y >= 0 && y <= D_i) ? 0 : (y > D_i && y <= D_i/D_rel) ? x<=ell_sf_A*(sqrt(sq((D_i/D_rel-D_i)/2.)-sq(y-D_i-(D_i/D_rel-D_i)/2.))) : 0));
+		//fraction (f0, difference((sq(D_i/D_rel) - sq(y) - sq(z)),(sq(D_i) - sq(y) - sq(z))));
 		fraction(f0,sq(D_i/D_rel) - sq(y) - sq(z));
+		//fraction (f0, ((y >= 0 && y <= D_i) ? x>=ell_sf_A*sqrt(sq(D_i)-sq(y)) : (y > D_i && y <= D_i/D_rel) ? x<=ell_sf_B*sqrt(sq(D_i/D_rel)-sq(y)) : 0));
 		f0.refine=f0.prolongation=fraction_refine;
 		restriction ({f0});
 		
 		foreach(){
-			//"Trim" the volume fraction to the initial jet profile, and append to f[]
+			//f[]=f0[]*(0<=x && D_i<=y && y<=D_i/D_rel && x<=ell_sf_A*(sqrt(sq((D_i/D_rel-D_i)/2.)-sq(y-D_i-(D_i/D_rel-D_i)/2.)))); // semi circle on yaxis
 			f[] = f0[]*(sq(D_i/D_rel) > sq(y) + sq(z) && sq(D_i) < sq(y) + sq(z) && x<=ell_sf_A*(sqrt(sq((D_i/D_rel-D_i)/2.)-sq(y-D_i-(D_i/D_rel-D_i)/2.))));
-			//Set initial velocity
-			u.x[]= sq(D_i)>=sq(y)+sq(z) && x<=D_i ? U_g : sq(D_i/D_rel)>=sq(y) + sq(z) && sq(D_i)<=sq(y)+sq(z) && x<=ell_sf_A*(sqrt(sq((D_i/D_rel-D_i)/2.)-sq(y-D_i-(D_i/D_rel-D_i)/2.))) ? f[]*U_g/U_rel : 0;
+			//f[] = f0[]*(x < length); //simple rectangular jet length ((y > 0 && y < D_i) ? x>=sqrt(sq(D_i)-sq(y)) : (y > D_i && y < D_i/D_rel) ? x<=sqrt(sq(D_i/D_rel)-sq(y)) : 0)
+			//f[]=f0[]*(x>=0 && y>=0 && y<=D_i/D_rel && ((y >= 0 && y <= D_i) ? x>=ell_sf_A*sqrt(sq(D_i)-sq(y)) : (y > D_i && y <= D_i/D_rel) ? x<=ell_sf_B*sqrt(sq(D_i/D_rel)-sq(y)) : 0) && x<=ell_sf_B*sqrt(sq(D_i/D_rel)-sq(y))); //quarter circles
+			u.x[]= sq(D_i)>=sq(y)+sq(z) && x<D_i ? U_g : sq(D_i/D_rel)>=sq(y) + sq(z) && sq(D_i)<=sq(y)+sq(z) && x<=ell_sf_A*(sqrt(sq((D_i/D_rel-D_i)/2.)-sq(y-D_i-(D_i/D_rel-D_i)/2.))) ? f[]*U_g/U_rel : 0;
+			//u.x[]=(y >= 0 && y < D_i && x<ell_sf_A*sqrt(sq(D_i)-sq(y))) ? 0 : (y >= D_i && y <= D_i/D_rel && x<=ell_sf_B*sqrt(sq(D_i/D_rel)-sq(y))) ? f[]*U_g/U_rel : 0;
 		}
 	}
 }
@@ -109,22 +113,24 @@ event perf_plot (t=T_END*U_rel) {
 	   "$BASILISK/navier-stokes/perfs.plot "
 	   "& read dummy; kill $!", "w");
 }
-
 //Output animation
 event movie (t += 1e-2){
-	//view (tx = -0.5);
-	view(tx = -0.5);
+
+	//view(fov=1, tx = -0.5, width=1280);
+	view (tx = -0.5);
 	clear();
 	draw_vof("f");
-	squares ("u.x", linear = true);
+	//squares ("u.x", linear = true);
 	box();
 	mirror(n={0,1}){
 		draw_vof("f");
 		//squares ("u.y", linear = true);
-		box();	
+		box();
 	}
+
 	save("movie.mp4");
 }
+
 
 //Output Paraview XML VTU file for post processing
 event field_binout (t+=0.1){
